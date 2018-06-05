@@ -59,4 +59,62 @@ export default class AuthCtrl {
 			console.log(500, e);
 		}
 	}
+
+	async localLogin(ctx: Context) {
+		interface BodySchema {
+			email: string;
+			password: string;
+		}
+
+		const schema = Joi.object().keys({
+			email: Joi.string().email().required(),
+			password: Joi.string().required()
+		});
+
+		const result: Joi.ValidationResult<string> = Joi.validate(ctx.request.body, schema);
+
+		if(result.error) {
+			ctx.status = 400; // Bad request;
+			return;
+		}
+
+		try {
+			const { email, password }: BodySchema = ctx.request.body;
+			const existsEmail = await User.checkEmail(email);
+			const validatePassword = await User.validatePassword(password);
+
+			if(!existsEmail || !validatePassword) {
+				ctx.status = 403;
+				return;
+			}
+
+			const account = await User.findByEmail(email);
+
+			ctx.body = account;
+
+		} catch(e) {
+			console.log(500, e);
+		}
+	}
+
+	async exists(ctx: Context) {
+		const { key, value } = ctx.params;
+		try {
+			const exists = await (key === 'email' ? User.checkEmail(value) : UserProfile.checkDisplayname(value));
+			ctx.body = {
+				exists: exists !== null
+			};
+		} catch(e) {
+			console.log(500, e);
+		}
+	}
+
+	async logout(ctx: Context) {
+		ctx.cookies.set('access_token', null, {
+			maxAge: 0,
+			httpOnly: true
+		});
+
+		ctx.status = 204;
+	}
 }
